@@ -36,16 +36,44 @@
             color: transparent;
         }
 
-        /* Estilo para el contenedor del chat */
-        #chat-container {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
+        /* Estilo para las barras de sonido */
+        .sound-bar-container {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            height: 30px;
+            align-items: flex-end;
         }
-        .chat-message {
-            text-align: left;
-            border-radius: 1.5rem; /* Esquinas más redondeadas */
+
+        .sound-bar {
+            width: 4px;
+            background-color: #f97316;
+            border-radius: 2px;
+            height: 5px; /* Altura inicial */
+        }
+
+        /* Animación para las barras de sonido */
+        .sound-bar-container.is-playing .sound-bar {
+            animation-name: animate-sound-bar;
+            animation-duration: 1s;
+            animation-timing-function: ease-in-out;
+            animation-iteration-count: infinite;
+        }
+        
+        .sound-bar:nth-child(1) { animation-delay: -1s; }
+        .sound-bar:nth-child(2) { animation-delay: -1.2s; }
+        .sound-bar:nth-child(3) { animation-delay: -0.8s; }
+        .sound-bar:nth-child(4) { animation-delay: -1.1s; }
+        .sound-bar:nth-child(5) { animation-delay: -0.9s; }
+        .sound-bar:nth-child(6) { animation-delay: -1.3s; }
+        .sound-bar:nth-child(7) { animation-delay: -0.7s; }
+        .sound-bar:nth-child(8) { animation-delay: -1.5s; }
+        .sound-bar:nth-child(9) { animation-delay: -1s; }
+        .sound-bar:nth-child(10) { animation-delay: -1.4s; }
+
+        @keyframes animate-sound-bar {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(3); }
         }
     </style>
 </head>
@@ -62,18 +90,31 @@
 
             <!-- Reproductor de Audio -->
             <div class="w-full">
-                <audio controls class="w-full rounded-full shadow-lg transition-all hover:shadow-xl hover:scale-105 duration-300">
+                <audio id="audioPlayer" controls class="w-full rounded-full shadow-lg transition-all hover:shadow-xl hover:scale-105 duration-300">
                     <!-- Reproductor de audio actualizado con el stream de Zeno.fm -->
                     <source src="https://stream.zeno.fm/0enb8vaznpouv.mp3" type="audio/mpeg">
                     Tu navegador no soporta el elemento de audio.
                 </audio>
             </div>
 
-            <!-- Contador de usuarios conectados -->
-            <div class="mt-4 text-white">
-                <p id="user-count" class="font-semibold text-lg">Usuarios conectados: 0</p>
+            <!-- Barras de Sonido -->
+            <div id="soundBarContainer" class="sound-bar-container mt-4">
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
+                <div class="sound-bar"></div>
             </div>
             
+
+[Image of a sound wave]
+
+
             <!-- Sección de Redes Sociales -->
             <div class="mt-8 space-y-4">
                 <h2 class="text-3xl font-bold text-white">Síguenos</h2>
@@ -92,13 +133,11 @@
         </div>
     </div>
 
-    <!-- Scripts de Firebase -->
+    <!-- Scripts de Firebase y Audio Visualizer -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+        
         // Firebase configuration and initialization
         const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof window.__firebase_config !== 'undefined' ? window.__firebase_config : '{}');
@@ -106,80 +145,23 @@
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
-        setLogLevel('debug');
 
-        let userId = null;
-        
-        // Sign in anonymously
-        async function signIn() {
+        // Función para manejar la autenticación
+        async function handleAuth() {
             try {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await signInAnonymously(auth);
                 }
-                userId = auth.currentUser.uid;
-                setupPresenceTracking();
             } catch (error) {
                 console.error("Error signing in: ", error);
             }
         }
+        
+        handleAuth();
 
-        // ===================================
-        // Funciones para el contador de usuarios
-        // ===================================
-        function setupPresenceTracking() {
-            const presenceCollectionRef = collection(db, `/artifacts/${appId}/public/data/users`);
-            const userDocRef = doc(presenceCollectionRef, userId);
-            const userCountElement = document.getElementById('user-count');
-            const threshold = Date.now() - 10000; // 10 segundos atrás
-
-            // Actualizar la presencia del usuario
-            const updatePresence = async () => {
-                await setDoc(userDocRef, {
-                    lastActive: Date.now()
-                });
-            };
-
-            // Escuchar los cambios en la colección de presencia
-            onSnapshot(presenceCollectionRef, async (snapshot) => {
-                let activeUsers = 0;
-                const batch = [];
-                snapshot.forEach(d => {
-                    const data = d.data();
-                    if (data.lastActive > threshold) {
-                        activeUsers++;
-                    } else {
-                        // Si el usuario está inactivo, lo eliminamos
-                        batch.push(deleteDoc(doc(presenceCollectionRef, d.id)));
-                    }
-                });
-                userCountElement.textContent = `Usuarios conectados: ${activeUsers}`;
-
-                // Ejecutar las eliminaciones en lote
-                if (batch.length > 0) {
-                    try {
-                        await Promise.all(batch);
-                    } catch (error) {
-                        console.error("Error eliminando documentos inactivos: ", error);
-                    }
-                }
-            }, (error) => {
-                console.error("Error al escuchar la presencia de usuarios: ", error);
-            });
-
-            // Mantener la presencia del usuario activa
-            updatePresence();
-            setInterval(updatePresence, 5000); // Actualiza cada 5 segundos
-        }
-
-        // ===================================
-        // Inicialización
-        // ===================================
-        signIn();
-
-        // Script to load background image
+        // Script para cargar la imagen de fondo
         window.addEventListener('load', () => {
             const bgImage = "Fondo.png";
             const body = document.body;
@@ -189,6 +171,24 @@
                 body.style.backgroundImage = `url('${bgImage}')`;
             };
         });
+
+        // ===================================
+        // Funcionalidad de las barras de sonido
+        // ===================================
+        const audioPlayer = document.getElementById('audioPlayer');
+        const soundBarContainer = document.getElementById('soundBarContainer');
+
+        if (audioPlayer && soundBarContainer) {
+            audioPlayer.addEventListener('play', () => {
+                soundBarContainer.classList.add('is-playing');
+            });
+            audioPlayer.addEventListener('pause', () => {
+                soundBarContainer.classList.remove('is-playing');
+            });
+            audioPlayer.addEventListener('ended', () => {
+                soundBarContainer.classList.remove('is-playing');
+            });
+        }
     </script>
 </body>
 </html>
