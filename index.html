@@ -73,40 +73,7 @@
             <div class="mt-4 text-white">
                 <p id="user-count" class="font-semibold text-lg">Usuarios conectados: 0</p>
             </div>
-
-            <!-- Sección de Chat en Vivo -->
-            <div class="mt-8 space-y-4">
-                <h2 class="text-3xl font-bold text-white">Chat en Vivo</h2>
-                <div id="user-info" class="text-sm text-gray-300">
-                    <span id="display-name-text">Nombre de Usuario: Cargando...</span>
-                </div>
-                
-                <!-- Contenedor para la entrada del nombre de usuario -->
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="text" id="display-name-input" placeholder="Elige tu nombre..."
-                        class="flex-1 p-3 rounded-full bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button id="set-name-btn"
-                        class="px-5 py-3 rounded-full bg-green-600 text-white font-semibold shadow-lg hover:bg-green-700 transition-colors">
-                        Guardar Nombre
-                    </button>
-                </div>
-                
-                <!-- Contenedor de mensajes del chat -->
-                <div id="chat-container" class="bg-gray-800 p-4 space-y-3 text-white">
-                    <!-- Los mensajes se mostrarán aquí -->
-                </div>
-
-                <!-- Formulario de entrada de chat -->
-                <form id="chat-form" class="flex gap-2">
-                    <input type="text" id="chat-input" placeholder="Escribe tu mensaje..."
-                        class="flex-1 p-3 rounded-full bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button id="send-message-btn" type="submit"
-                        class="px-5 py-3 rounded-full bg-blue-600 text-white font-semibold shadow-lg hover:bg-blue-700 transition-colors">
-                        Enviar
-                    </button>
-                </form>
-            </div>
-
+            
             <!-- Sección de Redes Sociales -->
             <div class="mt-8 space-y-4">
                 <h2 class="text-3xl font-bold text-white">Síguenos</h2>
@@ -125,11 +92,11 @@
         </div>
     </div>
 
-    <!-- Scripts de Firebase y Gemini API -->
+    <!-- Scripts de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, where, getDocs, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration and initialization
@@ -143,8 +110,6 @@
         setLogLevel('debug');
 
         let userId = null;
-        let authReady = false;
-        let displayName = "Anónimo";
         
         // Sign in anonymously
         async function signIn() {
@@ -155,133 +120,16 @@
                     await signInAnonymously(auth);
                 }
                 userId = auth.currentUser.uid;
-                
-                // Cargar nombre de usuario desde el almacenamiento local
-                const savedName = localStorage.getItem('chatDisplayName');
-                if (savedName) {
-                    displayName = savedName;
-                    document.getElementById('display-name-input').value = savedName;
-                }
-                document.getElementById('display-name-text').textContent = `Nombre: ${displayName}`;
-
-                authReady = true;
-                setupChatListener();
                 setupPresenceTracking();
             } catch (error) {
                 console.error("Error signing in: ", error);
             }
         }
 
-        // Función para formatear el timestamp a una cadena legible
-        function formatTimestamp(timestamp) {
-            const now = new Date();
-            const messageDate = new Date(timestamp);
-            const diffInDays = Math.floor((now - messageDate) / (1000 * 60 * 60 * 24));
-            const timeString = messageDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            
-            if (diffInDays === 0) {
-                return `Hoy, ${timeString}`;
-            } else if (diffInDays === 1) {
-                return `Ayer, ${timeString}`;
-            } else if (diffInDays > 1 && diffInDays < 7) {
-                return `Hace ${diffInDays} días`;
-            } else {
-                return messageDate.toLocaleDateString('es-ES', { 
-                    day: 'numeric', 
-                    month: 'short', 
-                    year: 'numeric' 
-                });
-            }
-        }
-
-        // Chat functionality
-        function setupChatListener() {
-            if (!authReady) return;
-            const chatCollectionPath = `/artifacts/${appId}/public/data/chat`;
-            const q = query(collection(db, chatCollectionPath));
-
-            onSnapshot(q, (snapshot) => {
-                const messagesContainer = document.getElementById('chat-container');
-                const messages = [];
-                snapshot.forEach((doc) => {
-                    messages.push(doc.data());
-                });
-
-                // Ordenar los mensajes por timestamp en el cliente, ya que Firestore no admite "orderBy" sin índice
-                messages.sort((a, b) => a.timestamp - b.timestamp);
-                
-                messagesContainer.innerHTML = '';
-                messages.forEach((messageData) => {
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add('chat-message', 'p-4', 'rounded-2xl', 'break-words', 'mb-2');
-                    
-                    const senderId = messageData.userId;
-                    const senderName = messageData.displayName || `Usuario (${senderId})`;
-                    const isUser = senderId === userId;
-                    const formattedDateTime = formatTimestamp(messageData.timestamp);
-                    
-                    if (isUser) {
-                        messageElement.classList.add('text-right', 'bg-blue-700', 'text-white');
-                    } else {
-                        messageElement.classList.add('text-left', 'bg-gray-700', 'text-white');
-                    }
-
-                    messageElement.innerHTML = `
-                        <p class="font-bold text-sm text-gray-300">
-                            ${isUser ? 'Tú' : senderName}:
-                        </p>
-                        <p class="mt-1">${messageData.message}</p>
-                        <span class="text-xs text-gray-400 mt-1 block">${formattedDateTime}</span>
-                    `;
-                    messagesContainer.appendChild(messageElement);
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                });
-            }, (error) => {
-                console.error("Error listening to chat messages: ", error);
-            });
-        }
-        
-        // Evento de escucha para el envío del mensaje
-        const chatForm = document.getElementById('chat-form');
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Detiene el reinicio de la página
-            const inputField = document.getElementById('chat-input');
-            const message = inputField.value.trim();
-
-            if (message && userId) {
-                try {
-                    const chatCollectionPath = `/artifacts/${appId}/public/data/chat`;
-                    await addDoc(collection(db, chatCollectionPath), {
-                        message: message,
-                        userId: userId,
-                        displayName: displayName,
-                        timestamp: Date.now()
-                    });
-                    inputField.value = '';
-                } catch (error) {
-                    console.error("Error adding document: ", error);
-                }
-            } else {
-                console.error("No message to send or user not authenticated.");
-            }
-        });
-
-        document.getElementById('set-name-btn').addEventListener('click', () => {
-            const nameInput = document.getElementById('display-name-input');
-            const newName = nameInput.value.trim();
-            if (newName) {
-                displayName = newName;
-                localStorage.setItem('chatDisplayName', newName);
-                document.getElementById('display-name-text').textContent = `Nombre: ${displayName}`;
-            }
-        });
-
         // ===================================
         // Funciones para el contador de usuarios
         // ===================================
         function setupPresenceTracking() {
-            if (!authReady) return;
-
             const presenceCollectionRef = collection(db, `/artifacts/${appId}/public/data/users`);
             const userDocRef = doc(presenceCollectionRef, userId);
             const userCountElement = document.getElementById('user-count');
