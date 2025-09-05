@@ -97,14 +97,14 @@
                 </div>
 
                 <!-- Formulario de entrada de chat -->
-                <form id="chat-form" class="flex gap-2">
+                <div class="flex gap-2">
                     <input type="text" id="chat-input" placeholder="Escribe tu mensaje..."
                         class="flex-1 p-3 rounded-full bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit"
+                    <button id="send-message-btn" type="button"
                         class="px-5 py-3 rounded-full bg-blue-600 text-white font-semibold shadow-lg hover:bg-blue-700 transition-colors">
                         Enviar
                     </button>
-                </form>
+                </div>
             </div>
 
             <!-- Sección de Redes Sociales -->
@@ -241,10 +241,9 @@
             });
         }
         
-        // Evento de escucha para el envío del formulario
-        const chatForm = document.getElementById('chat-form');
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Previene la recarga de la página
+        // Evento de escucha para el envío del mensaje
+        const sendMessageBtn = document.getElementById('send-message-btn');
+        sendMessageBtn.addEventListener('click', async () => {
             const inputField = document.getElementById('chat-input');
             const message = inputField.value.trim();
 
