@@ -235,8 +235,10 @@
             });
         }
         
-        document.getElementById('chat-form').addEventListener('submit', async (e) => {
-            e.preventDefault(); // Previene el reinicio de la página
+        // Evento de escucha para el envío del formulario
+        const chatForm = document.getElementById('chat-form');
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Previene la recarga de la página
             const inputField = document.getElementById('chat-input');
             const message = inputField.value.trim();
 
