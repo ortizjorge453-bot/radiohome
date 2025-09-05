@@ -69,6 +69,11 @@
                 </audio>
             </div>
 
+            <!-- Contador de usuarios conectados -->
+            <div class="mt-4 text-white">
+                <p id="user-count" class="font-semibold text-lg">Usuarios conectados: 0</p>
+            </div>
+
             <!-- Sección de Chat en Vivo -->
             <div class="mt-8 space-y-4">
                 <h2 class="text-3xl font-bold text-white">Chat en Vivo</h2>
@@ -124,7 +129,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, where, getDocs, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration and initialization
@@ -161,6 +166,7 @@
 
                 authReady = true;
                 setupChatListener();
+                setupPresenceTracking();
             } catch (error) {
                 console.error("Error signing in: ", error);
             }
@@ -269,6 +275,56 @@
                 document.getElementById('display-name-text').textContent = `Nombre: ${displayName}`;
             }
         });
+
+        // ===================================
+        // Funciones para el contador de usuarios
+        // ===================================
+        function setupPresenceTracking() {
+            if (!authReady) return;
+
+            const presenceCollectionRef = collection(db, `/artifacts/${appId}/public/data/users`);
+            const userDocRef = doc(presenceCollectionRef, userId);
+            const userCountElement = document.getElementById('user-count');
+            const threshold = Date.now() - 10000; // 10 segundos atrás
+
+            // Actualizar la presencia del usuario
+            const updatePresence = async () => {
+                await setDoc(userDocRef, {
+                    lastActive: Date.now()
+                });
+            };
+
+            // Escuchar los cambios en la colección de presencia
+            onSnapshot(presenceCollectionRef, async (snapshot) => {
+                let activeUsers = 0;
+                const batch = [];
+                snapshot.forEach(d => {
+                    const data = d.data();
+                    if (data.lastActive > threshold) {
+                        activeUsers++;
+                    } else {
+                        // Si el usuario está inactivo, lo eliminamos
+                        batch.push(deleteDoc(doc(presenceCollectionRef, d.id)));
+                    }
+                });
+                userCountElement.textContent = `Usuarios conectados: ${activeUsers}`;
+
+                // Ejecutar las eliminaciones en lote
+                if (batch.length > 0) {
+                    try {
+                        await Promise.all(batch);
+                    } catch (error) {
+                        console.error("Error eliminando documentos inactivos: ", error);
+                    }
+                }
+            }, (error) => {
+                console.error("Error al escuchar la presencia de usuarios: ", error);
+            });
+
+            // Mantener la presencia del usuario activa
+            updatePresence();
+            setInterval(updatePresence, 5000); // Actualiza cada 5 segundos
+        }
 
         // ===================================
         // Inicialización
